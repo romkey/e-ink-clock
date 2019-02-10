@@ -1,0 +1,28 @@
+#pragma once
+
+#include <Arduino.h>
+
+#include <GxEPD.h>
+#include <GxEPD.h>
+#include <GxGDEW042T2/GxGDEW042T2.h>
+#include <GxIO/GxIO_SPI/GxIO_SPI.h>
+#include <GxIO/GxIO.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
+
+class ClockUI {
+public:
+  ClockUI(GxEPD_Class *display) : _display(display) { };
+
+  void show_wifi_symbol();
+  void clear_wifi_symbol();
+
+  void show_network_info(IPAddress local_ip, const char* name, const char* ssid);
+  void clear_network_info();
+
+  void show_time();
+  void clear_time();
+
+private:
+  GxEPD_Class* _display;
+};
