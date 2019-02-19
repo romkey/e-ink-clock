@@ -15,11 +15,6 @@ OWMconditions      owCC;
 OWMfiveForecast    owF5;
 OWMsixteenForecast owF16;
 
-#ifdef U8G2
-#include <U8g2_for_Adafruit_GFX.h>
-U8G2_FOR_ADAFRUIT_GFX u8g2;
-#endif
-
 
 #include "ui.h"
 
@@ -29,9 +24,6 @@ U8G2_FOR_ADAFRUIT_GFX u8g2;
 // GxEPD_Class display(io, rst, busy);
 GxIO_Class     io(SPI, SS, 17, 16);
 GxEPD_Class    display(io, 16, 4);
-
-const GFXfont* f = &FreeMonoBold24pt7b;
-
 
 ClockUI clock_ui(&display);
 
@@ -69,29 +61,15 @@ void setup() {
   Serial.begin(115200);
 
   Serial.println("Starting...");
+  clock_ui.begin();
   delay(1000);
-
-  display.init(115200);
-  display.setRotation(0);
-  display.fillScreen(GxEPD_WHITE);
-  display.setTextColor(GxEPD_BLACK);
-  display.setFont(f);
-
-#ifdef U8G2
-  u8g2.begin(display);
-  Serial.println("u8g2 connected");
-
-  u8g2.setFontMode(1);                 // use u8g2 transparent mode (this is default)
-  u8g2.setFontDirection(0);            // left to right (this is default)
-  u8g2.setBackgroundColor(GxEPD_WHITE);      // apply Adafruit GFX color
-  u8g2.setForegroundColor(GxEPD_BLACK);      // apply Adafruit GFX color
-#endif
-
-  clock_ui.show_wifi_symbol();
-  display.update();
-
   Serial.println("eink setup done");
-  delay(500);
+
+#if 0
+  clock_ui.test();
+  Serial.println("test done");
+  delay(100000);
+#endif
 
 #ifdef U8G2
   //  u8g2.setFont(u8g2_font_helvR14_tf);  // select u8g2 font from here: https://github.com/olikraus/u8g2/wiki/fntlistall
@@ -162,11 +140,13 @@ void setup() {
       else if (error == OTA_END_ERROR) Serial.println("End Failed");
     });
 
+
   clock_ui.clear_wifi_symbol();
 
   clock_ui.show_network_info(WiFi.localIP(), HOSTNAME, WiFi.SSID().c_str());
 
-  start_showing_clock = millis() + 30 * 1000;
+  //  start_showing_clock = millis() + 30 * 1000;
+  start_showing_clock = millis() + 1 * 1000;
 
 #if 0
   display.update();
@@ -177,42 +157,6 @@ void setup() {
   Serial.println("[setup done]");
 }
 
-typedef struct {
-  uint16_t x;
-  uint16_t y;
-  uint16_t w;
-  uint16_t h;
-} box_t;
-
-void prep_box(box_t *box) {
-  display.fillRect(box->x, box->y, box->w, box->h, GxEPD_WHITE);
-  //  display.fillScreen(GxEPD_WHITE);
-  //    u8g2.setCursor(box->x+4, box->y + 16 + 38);
-#ifdef U8G2
-  u8g2.setCursor(0, 100);
-#else
-  display.setCursor(box->x+4, box->y + 16 + 38);
-#endif
-}
-
-#define update_box(box) display.updateWindow(box.x, box.y, box.w, box.h, true)
-
-static box_t time_box = {
-  .x = 5,
-  .y = 10,
-  .w = 380,
-  .h = 100
-};
-
-static box_t day_box = {
-};
-
-static box_t date_box = {
-};
-
-static box_t weather_box = {
-};
-
 void update_time() {
   //   uint16_t cursor_y = time_box.y + 16;
   struct tm timeinfo;
@@ -221,22 +165,9 @@ void update_time() {
   now = time(NULL);
   localtime_r(&now, &timeinfo);
 
-  prep_box(&time_box);
-#ifdef U8G2
-  u8g2.printf("%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-#else
-  display.printf("%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-#endif
-  update_box(time_box);
+  clock_ui.show_time(&timeinfo);
 
   Serial.println(asctime(&timeinfo));
-}
-
-
-void update_date() {
-}
-
-void update_day() {
 }
 
 void owm_conditions() {
@@ -250,11 +181,17 @@ void owm_conditions() {
 
 void loop() {
   static unsigned long next_weather_update = 0;
+  static uint8_t draw_clock_ui = 1;
 
   ArduinoOTA.handle();
 
   if(millis() < start_showing_clock)
     return;
+
+  if(draw_clock_ui) {
+    draw_clock_ui = 0;
+    clock_ui.setup_time();
+  }
 
   static tm last_timeinfo = {
     .tm_sec = -1,

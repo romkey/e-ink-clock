@@ -1,0 +1,20 @@
+#define WIFI_SSID1     "YOUR WIFI1 SSID"
+#define WIFI_PASSWORD1 "YOUR WIFI1 PASSWORD"
+
+#define WIFI_SSID2     "YOUR WIFI1 SSID"
+#define WIFI_PASSWORD2 "YOUR WIFI1 PASSWORD"
+
+#define WIFI_SSID3     "YOUR WIFI1 SSID"
+#define WIFI_PASSWORD3 "YOUR WIFI1 PASSWORD"
+
+#define HOSTNAME "eink-clock"
+
+// currently pacific time
+#define TZ_OFFSET -8*60*60 
+#define DST_OFFSET 0
+
+#define OPEN_WEATHERMAP_API_KEY "YOUR OPENWEATHERMAP KEY"
+
+#define IFTTT_API_KEY        "YOUR IFFT API KEY"
+#define IFTTT_TRIGGER_NAME   "eink-clock"
+
