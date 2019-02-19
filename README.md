@@ -11,10 +11,18 @@ FInally, it also supports an optional ambient light sensor. This allows the cloc
 
 # Hardware
 
-- Wemos LOLIN32 ESP32
-- Waveshare epaper 4.2inch module
-- optional BME280 I2C temperature/humidity/pressure sensor
-- optional I2C real time clock
+Prices are obviously from the time I made this list. Links to parts are meant to show parts that have identical pinouts to the ones I used in the PC board layout. The specific items may become unavailable over time or the listings might even change to other parts with incompatible pinouts, so *please be careful to make sure you get parts with the correct pinouts* if you want to use the PC board - this is meant to be a guide to the parts and not a specific shopping list. 
+
+| Part                               | AliExpress | Amazon |
+|-------------------|--------:|-------:|
+|Waveshare 4.2" epaper module | [$28.79](https://www.aliexpress.com/item/400x300-4-2inch-E-Ink-display-module-No-backlight-Ultra-low-power-consumption-SPI-interface-Compatible/32826601765.html) | [$38.99](https://www.amazon.com/gp/product/B074NR1SW2) |
+|Wemos LOLIN32 ESP32 | []() | [$9.99 + $4.99](https://www.amazon.com/Beaster-LOLIN32-V1-0-0-Bluetooth-Development/dp/B07KFF1GJK) |
+|BME280 breakout | []() | [$11.20](https://www.amazon.com/gp/product/B0775XFW69) |
+|DS3231 RTC breakout | []() | [$6.99](https://www.amazon.com/gp/product/B01IXXACD0) |
+|photoresistor | []() | []() |
+|         | | $72.16 |
+
+
 
 # Software
 
