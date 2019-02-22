@@ -16,17 +16,19 @@ Prices are obviously from the time I made this list. Links to parts are meant to
 | Part                               | AliExpress | Amazon | Notes |
 |-------------------|--------:|-------:|--|
 |Waveshare 4.2" epaper module | [$28.79](https://www.aliexpress.com/item/400x300-4-2inch-E-Ink-display-module-No-backlight-Ultra-low-power-consumption-SPI-interface-Compatible/32826601765.html) | [$38.99](https://www.amazon.com/gp/product/B074NR1SW2) | |
-|Wemos LOLIN32 ESP32 | []() | [$9.99 + $4.99](https://www.amazon.com/Beaster-LOLIN32-V1-0-0-Bluetooth-Development/dp/B07KFF1GJK) | |
-|BME280 breakout | []() | [$11.20](https://www.amazon.com/gp/product/B0775XFW69) | *optional*  lets you read the temperature, hunmidity and pressure where the clock is |
-|DS3231 RTC breakout | []() | [$6.99](https://www.amazon.com/gp/product/B01IXXACD0) | *optional* keeps more accurate time, works without NTP or wifi |
+|Wemos LOLIN32 ESP32 | [$5.50](https://www.aliexpress.com/item/ESP-32-ESP32-ESP-WROOM-32-for-WeMos-D1-LOLIN32-V1-0-02-WIFI-Bluetooth-Development/32887251214.html) | [$9.99 + $4.99](https://www.amazon.com/Beaster-LOLIN32-V1-0-0-Bluetooth-Development/dp/B07KFF1GJK) | |
+|BME280 breakout | [$2.50](https://www.aliexpress.com/item/High-Accuracy-3In1-BME280-Digital-Sensor-Temperature-Humidity-Barometric-Pressure-Sensor-Module-GY-BME280-I2C-SPI/32817230797.html) | [$11.20](https://www.amazon.com/gp/product/B0775XFW69) | *optional*  lets you read the temperature, hunmidity and pressure where the clock is |
+|DS3231 RTC breakout | [$1.04](https://www.aliexpress.com/item/DS3231-AT24C32-IIC-High-Precision-RTC-Module-Clock-Timer-Memory-Module/2037934408.html) | [$6.99](https://www.amazon.com/gp/product/B01IXXACD0) | *optional* keeps more accurate time, works without NTP or wifi |
 |photoresistor | []() | []() | *optional* lets the clock power off display in the dark |
-|         | | $72.16 |
+|         |$37.83 | $72.16 |
 
 
 
 # Software
 
 The e-ink clock software is built using the Arduino SDK. It builds under [PlatformIO](https://platformio.org/) but with a little rearranging you could also build it with the Arduino IDE.
+
+The application uses the [GxEPD](https://github.com/ZinggJM/GxEPD) library to drive the Waveshare display. GxEPD is a subclass of [Adafruit_GFX](https://github.com/adafruit/Adafruit-GFX-Library), so you can use its API to talk to the display. It also supports fast partial update on some Waveshare displays, which lets you write to the display much faster than a full screen write, without distracting flashing.
 
 ## Resources:
 
