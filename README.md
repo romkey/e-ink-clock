@@ -1,5 +1,7 @@
 # e-ink wifi clock
 
+_This is a work in progress. I'm still testing and updating the hardware, and the software is incomplete. Build at your own risk._
+
 Use a Waveshare epaper (e-ink) display as a digital wifi clock. The clock synchronizes its time with NTP and can show local weather using OpenWeatherMap.
 
 The clock also supports an optional environmental sensor module, which allows it to report the temperature, humidity and air pressure in the space it's in.
@@ -24,6 +26,9 @@ Prices are obviously from the time I made this list. Links to parts are meant to
 
 Obviously AliExpress is an economical choice if you can wait a month or more for your parts to arrive. 
 
+The printed circuit board uses breakout boards and is easy to assemble. The current version is at https://oshpark.com/shared_projects/apAIFWjg
+
+The hardware is still in testing; I cannot make any promises about its suitability for any use or its reliability.
 
 
 # Software
