@@ -13,6 +13,10 @@ FInally, it also supports an optional ambient light sensor. This allows the cloc
 
 # Hardware
 
+Eagle schematics and board are in the `eagle` directory. 
+
+_The hardware is still in testing; I cannot make any promises about its suitability for any use or its reliability._
+
 Prices are obviously from the time I made this list. Links to parts are meant to show parts that have identical pinouts to the ones I used in the PC board layout. The specific items may become unavailable over time or the listings might even change to other parts with incompatible pinouts, so *please be careful to make sure you get parts with the correct pinouts* if you want to use the PC board - this is meant to be a guide to the parts and not a specific shopping list. 
 
 | Part                               | AliExpress | Amazon | Notes |
@@ -28,7 +32,6 @@ Obviously AliExpress is an economical choice if you can wait a month or more for
 
 The printed circuit board uses breakout boards and is easy to assemble. The current version is at https://oshpark.com/shared_projects/apAIFWjg
 
-The hardware is still in testing; I cannot make any promises about its suitability for any use or its reliability.
 
 
 # Software
