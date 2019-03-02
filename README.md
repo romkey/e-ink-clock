@@ -22,6 +22,8 @@ Prices are obviously from the time I made this list. Links to parts are meant to
 |photoresistor | []() | []() | *optional* lets the clock power off display in the dark |
 |         |$37.83 | $72.16 |
 
+Obviously AliExpress is an economical choice if you can wait a month or more for your parts to arrive. 
+
 
 
 # Software

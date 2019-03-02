@@ -16,6 +16,14 @@ OWMfiveForecast    owF5;
 OWMsixteenForecast owF16;
 
 
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+Adafruit_BME280 bme280;
+
+
+
 #include "ui.h"
 
 // BUSY -> 4, RST -> 16, DC -> 17, CS -> SS(5), CLK -> SCK(18), DIN -> MOSI(23), GND -> GND, 3.3V -> 3.3V
@@ -154,6 +162,11 @@ void setup() {
 
   ArduinoOTA.begin();
 
+  if(!bme280.begin(0x76)) {
+    Serial.println("bme280 fail");
+  }
+  Serial.println("[bme280]");
+
   Serial.println("[setup done]");
 }
 
@@ -177,6 +190,14 @@ void owm_conditions() {
   Serial.print("Latitude & Longtitude: ");
   Serial.print("<" + ow_cond->longtitude + " " + ow_cond->latitude + "> @" + ow_cond->dt + ": ");
   Serial.println("icon: " + ow_cond->icon + ", " + " temp.: " + ow_cond->temp + ", press.: " + ow_cond->pressure);
+}
+
+static float last_indoor_temperature = 0;
+static float last_indoor_humidity = 0;
+
+void update_indoor_conditions() {
+  if(last_indoor_temperature && last_indoor_humidity)
+    clock_ui.show_indoor(last_indoor_temperature, last_indoor_humidity);
 }
 
 void loop() {
@@ -216,4 +237,43 @@ void loop() {
     owm_conditions();
   }
 #endif
+
+
+  static unsigned long next_bme280_update = 1000*10;
+  if(millis() > next_bme280_update) {
+    bool redraw = false;
+
+    next_bme280_update = millis() + 1000*10;
+
+    if(last_indoor_temperature != bme280.readTemperature()) {
+      last_indoor_temperature = bme280.readTemperature();
+      redraw = true;
+    }
+
+    if(last_indoor_humidity != bme280.readHumidity()) {
+      last_indoor_humidity = bme280.readHumidity();
+      redraw = true;
+    }
+    
+    if(redraw)
+      update_indoor_conditions();
+
+    Serial.print("BME280 Temperature = ");
+    Serial.print(last_indoor_temperature);
+    Serial.println(" *C");
+
+    Serial.print("Pressure = ");
+    Serial.print(bme280.readPressure());
+    Serial.println(" hPa");
+
+    Serial.print("Approx. Altitude = ");
+    Serial.print(bme280.readAltitude(SEALEVELPRESSURE_HPA));
+    Serial.println(" m");
+
+    Serial.print("Humidity = ");
+    Serial.print(last_indoor_humidity);
+    Serial.println(" %");
+
+    Serial.println();
+  }
 }

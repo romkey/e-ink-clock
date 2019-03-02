@@ -1,11 +1,15 @@
 #include "ui.h"
 
+#include <Fonts/FreeMonoBold24pt7b.h>
+
 #include "digital7mono967b.h"
 
 #include "wifi_bmp.h"
 
 static const GFXfont* f12 = &FreeMonoBold12pt7b;
 static const GFXfont* f18 = &FreeMonoBold18pt7b;
+static const GFXfont* f24 = &FreeMonoBold24pt7b;
+
 static const GFXfont* f96 = &digital_7__mono_96pt7b;
 
 // screen is 300h x 400w
@@ -90,6 +94,21 @@ void ClockUI::show_time(struct tm *timeinfo) {
 void ClockUI::clear_time() {
   _display->fillRect(10, 10, 200, 200, GxEPD_WHITE);
   _display->updateWindow(10, 10, 200, 200);
+}
+
+void ClockUI::show_indoor(float temperature, float humidity) {
+  temperature = (temperature * 9 / 5) + 32 - 3.2;
+
+  _display->setFont(f24);
+
+  _display->fillRect(0, 224, 400, 300, GxEPD_WHITE);
+  _display->setTextSize(1);
+  _display->setTextWrap(false);
+  _display->setTextColor(GxEPD_BLACK, GxEPD_WHITE);
+
+  _display->setCursor(0, 270);
+  _display->printf("%d %d%%\n", (int)temperature, (int)humidity);
+  _display->updateWindow(0, 224, 400, 300);
 }
 
 void ClockUI::test() {

@@ -33,6 +33,8 @@ public:
   void show_time(struct tm* timeinfo);
   void clear_time();
 
+  void show_indoor(float temperature, float humidity);
+
 private:
   GxEPD_Class* _display;
 };
