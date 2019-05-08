@@ -34,6 +34,7 @@ public:
   void clear_time();
 
   void show_indoor(float temperature, float humidity);
+  void show_outdoor(float temperature, float humidity);
 
 private:
   GxEPD_Class* _display;

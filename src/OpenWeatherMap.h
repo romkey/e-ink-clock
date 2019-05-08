@@ -1,143 +1,53 @@
-#ifndef OpenWeather_h
-#define OpenWeather_h
+#pragma once
 
-#include <JsonListener.h>
-#include <JsonStreamingParser.h>
+#define OPENWEATHERMAP_API_KEY_LENGTH 33
 
-//------------------------------------------ Universal weather request parcer for opewWeatherMap site ---------
-#define OWM_max_layers 4
-class OWMrequest: public JsonListener {
-  public:
-    void init(void);
-    OWMrequest() : JsonListener()                   { }
-    virtual void key(String key)                    { currentKey = String(key); }
-    virtual void endObject();
-    virtual void startObject();
-    virtual void whitespace(char c)                 { }
-    virtual void startDocument()                    { }
-    virtual void endArray()                         { }
-    virtual void endDocument()                      { }
-    virtual void startArray()                       { }
-  protected:
-    void   doUpdate(String url, byte maxForecasts = 0);
-    String currentKey;
-    String currentParent;
-    String p_key[OWM_max_layers];
+#define _OPENWEATHERMAP_FINGERPRINT  "6C:9D:1E:27:F1:13:7B:C7:B6:15:90:13:F2:D0:29:97:A4:5B:3F:7E"
+
+#define KELVIN_TO_C(k) (k - 273.15)
+#define C_TO_F(c) (c * 9 / 5.0) + 32
+
+class OpenWeatherMapConditions {
+public:
+  float temp = 0;
+  float temp_min = 0;
+  float temp_max = 0;
+
+  uint8_t humidity = 0;
+  uint16_t pressure = 0;
+
+  uint16_t wind_deg = 0;
+  float wind_speed = 0;
+
+  float rain1h = 0;
+
+  uint16_t weather_id = 0;
+
+  uint32_t sunrise = 0;
+  uint32_t sunset = 0;
 };
 
-//------------------------------------------ Current weather conditions from openweatrhermap.org --------------
-typedef struct sOWM_conditions {
-  String longtitude;
-  String latitude;
-  String id;
-  String main;
-  String description;
-  String icon;
-  String temp;
-  String pressure;
-  String humidity;
-  String t_min;
-  String t_max;
-  String visibility;
-  String w_speed;
-  String w_deg;
-  String cond;                                      // conditions: cloud, rain, snow
-  String cond_value;
-  String dt;
-  String sunrise;
-  String sunset;
-} OWM_conditions;
+class OpenWeatherMap {
+ public:
+  OpenWeatherMap(const char* api_key, const char* location);
+  OpenWeatherMap(const char* api_key, int city_code);
+  OpenWeatherMap(const char* api_key);
 
-class OWMconditions : public OWMrequest {
-  public:
-    OWMconditions()                                { currentParent = ""; }
-    void    init(void)                             { currentParent = ""; }
-    void    updateConditions(OWM_conditions *conditions, String apiKey,
-              String country, String city, String units = "", String language = "");
-    virtual void value(String value);
+  int update_current();
+  OpenWeatherMapConditions current() { return _current_conditions; };
 
-  private:
-    OWM_conditions *conditions;
+  const char* last_error() { return _last_error; };
+
+ private:
+  char _api_key[OPENWEATHERMAP_API_KEY_LENGTH + 1];
+  const char* _zip_code = "";
+  int _city_id = 0;
+
+  unsigned long _last_updated;
+  char _last_error[32] = "";
+
+  OpenWeatherMapConditions _current_conditions;
+  OpenWeatherMapConditions _5day_forecast[5];
+
+  const char* _openweathermap_fingerprint;
 };
-
-
-//------------------------------------------ Five day forecast from openweatrhermap.org -----------------------
-typedef struct sOWM_fiveForecast {
-  String dt;
-  String temp;
-  String t_min;
-  String t_max;
-  String pressure;
-  String sea_pressure;
-  String humidity;
-  String id;
-  String main;
-  String description;
-  String icon;
-  String w_speed;
-  String w_deg;
-  String cond;                                      // conditions: cloud, rain, snow
-  String cond_value;
-} OWM_fiveForecast;
-
-class OWMfiveForecast : public OWMrequest {
-  public:
-    OWMfiveForecast()                               { }
-    byte    updateForecast(OWM_fiveForecast *forecasts, byte maxForecasts, String apiKey,
-              String country, String city, String units = "", String language = "");
-    virtual void value(String value);
-
-  private:
-    byte     index;
-    uint32_t timestamp;
-    byte     max_forecasts;
-    OWM_fiveForecast *forecasts;
-};
-
-//------------------------------------------ Sexteen days weather forecast from openweathermap.org -----------
-typedef struct sOWM_sixteenLocation {
-  String city_id;
-  String city_name;
-  String longtitude;
-  String latitude;
-  String country;
-  String population;
-  String cod;
-  String message;  
-} OWM_sixteenLocation;
-
-typedef struct sOWM_sixteenForecast {
-  String dt;
-  String t_min;
-  String t_max;
-  String t_night;
-  String t_morning;
-  String t_day;
-  String t_evening;
-  String pressure;
-  String humidity;
-  String id;
-  String main;
-  String description;
-  String icon;
-  String w_speed;
-  String w_deg;
-  String clouds;
-} OWM_sixteenForecast;
-
-class OWMsixteenForecast : public OWMrequest {
-  public:
-    OWMsixteenForecast()                            { }
-    byte    updateForecast(OWM_sixteenLocation *location, OWM_sixteenForecast *forecasts, byte maxForecasts, String apiKey,
-              String country, String city, String units = "", String language = "");
-    virtual void value(String value);
-
-  private:
-    byte     index;
-    uint32_t timestamp;
-    byte     max_forecasts;
-    OWM_sixteenLocation *location;
-    OWM_sixteenForecast *forecasts;
-};
-
-#endif

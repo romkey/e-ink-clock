@@ -11,18 +11,18 @@
 IFTTTWebhook ifttt(IFTTT_API_KEY, IFTTT_TRIGGER_NAME);
 
 #include "OpenWeatherMap.h"
-OWMconditions      owCC;
-OWMfiveForecast    owF5;
-OWMsixteenForecast owF16;
 
+OpenWeatherMap owm(OPEN_WEATHERMAP_API_KEY, OPEN_WEATHERMAP_CITY_CODE);
+
+#include <PubSubClient.h>
+static WiFiClient wifi_mqtt_client;
+static PubSubClient mqtt_client(wifi_mqtt_client);
 
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 Adafruit_BME280 bme280;
-
-
 
 #include "ui.h"
 
@@ -34,6 +34,12 @@ GxIO_Class     io(SPI, SS, 17, 16);
 GxEPD_Class    display(io, 16, 4);
 
 ClockUI clock_ui(&display);
+
+#include "uptime.h"
+
+Uptime uptime;
+
+#define AMBIENT_LIGHT_PIN 35
 
 #include <rom/rtc.h>
 
@@ -62,11 +68,22 @@ WiFiMulti wifiMulti;
 
 unsigned long start_showing_clock = 0;
 
+static char hostname[sizeof("eink-clock-%02x%02x%02x") + 1];
+
 void setup() {
+  byte mac_address[6];
+  
   delay(500);
 
   randomSeed(analogRead(0));
   Serial.begin(115200);
+  Serial.println("Hello world");
+
+  WiFi.macAddress(mac_address);
+  snprintf(hostname, sizeof(hostname), "eink-clock-%02x%02x%02x", (int)mac_address[3], (int)mac_address[4], (int)mac_address[5]);
+  Serial.printf("Hostname is %s\n", hostname);
+
+  WiFi.setHostname(hostname);
 
   Serial.println("Starting...");
   clock_ui.begin();
@@ -79,23 +96,12 @@ void setup() {
   delay(100000);
 #endif
 
-#ifdef U8G2
-  //  u8g2.setFont(u8g2_font_helvR14_tf);  // select u8g2 font from here: https://github.com/olikraus/u8g2/wiki/fntlistall
-  //  u8g2.setFont(u8g2_font_logisoso92_tn);
-  //  u8g2.setCursor(0,100);                // start writing at this position
-  //  u8g2.print(F("123 Hello"));
-  //  display.update();
-  //  delay(2000);
-#endif
-
   Serial.println("[wifi]");
 
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASSWORD1);
   wifiMulti.addAP(WIFI_SSID2, WIFI_PASSWORD2);
   wifiMulti.addAP(WIFI_SSID3, WIFI_PASSWORD3);
 
-  //  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  //  while(WiFi.status() != WL_CONNECTED) {
   while(wifiMulti.run() != WL_CONNECTED) {
     Serial.print(".");
     delay(200);
@@ -104,11 +110,14 @@ void setup() {
   Serial.print("Local IP ");
   Serial.println(WiFi.localIP());
 
-  Serial.println("[mdns]");
-  MDNS.begin(HOSTNAME);
+  if(!MDNS.begin(hostname))
+    Serial.println("Error setting up MDNS responder!");
+  else
+    Serial.println("[mDNS]");
 
   Serial.println("[IFTTT]");
   ifttt.trigger("reboot", reboot_reason(rtc_get_reset_reason(0)),  reboot_reason(rtc_get_reset_reason(1)));
+
 
   Serial.println("[NTP]");
   configTime(TZ_OFFSET, DST_OFFSET, "pool.ntp.org", "time.nist.gov");
@@ -162,6 +171,12 @@ void setup() {
 
   ArduinoOTA.begin();
 
+  mqtt_client.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt_client.connect(MQTT_UUID, MQTT_USER, MQTT_PASS);
+
+  Serial.println("[homebus]");
+  Serial.println("[mqtt]");
+
   if(!bme280.begin(0x76)) {
     Serial.println("bme280 fail");
   }
@@ -184,12 +199,12 @@ void update_time() {
 }
 
 void owm_conditions() {
-  OWM_conditions *ow_cond = new OWM_conditions;
-  owCC.updateConditions(ow_cond, OPEN_WEATHERMAP_API_KEY, "us", "Portland", "english");
+  static float last_outdoor_tempearture = 0;
+  static float last_outdoor_humidity = 0;
 
-  Serial.print("Latitude & Longtitude: ");
-  Serial.print("<" + ow_cond->longtitude + " " + ow_cond->latitude + "> @" + ow_cond->dt + ": ");
-  Serial.println("icon: " + ow_cond->icon + ", " + " temp.: " + ow_cond->temp + ", press.: " + ow_cond->pressure);
+  OpenWeatherMapConditions current = owm.current();
+
+  clock_ui.show_outdoor(current.temp, current.humidity);
 }
 
 static float last_indoor_temperature = 0;
@@ -203,6 +218,20 @@ void update_indoor_conditions() {
 void loop() {
   static unsigned long next_weather_update = 0;
   static uint8_t draw_clock_ui = 1;
+  static unsigned long last_mqtt_check = 0;
+
+  unsigned ambient_light = analogRead(AMBIENT_LIGHT_PIN);
+
+  mqtt_client.loop();
+
+  if(millis() > last_mqtt_check + 5000) {
+    if(!mqtt_client.connected()) {
+      mqtt_client.connect(MQTT_UUID, MQTT_USER, MQTT_PASS);
+      Serial.println("mqtt reconnect");
+    }
+
+    last_mqtt_check = millis();
+  }
 
   ArduinoOTA.handle();
 
@@ -225,19 +254,25 @@ void loop() {
   now = time(NULL);
   localtime_r(&now, &timeinfo);
 
+#ifdef CHECK_AMBIENT_LIGHT
   if(last_timeinfo.tm_sec != timeinfo.tm_sec) {
+#else
+  if(last_timeinfo.tm_sec != timeinfo.tm_sec && ambient_light > 0) {
+#endif
     update_time();
     last_timeinfo = timeinfo;
   }
 
-#if 0
+#ifdef CHECK_AMBIENT_LIGHT
+  if(millis() > next_weather_update && ambient_light > 0) {
+#else
   if(millis() > next_weather_update) {
+#endif
     next_weather_update += 1000 * 60;
 
+    owm.update_current();
     owm_conditions();
   }
-#endif
-
 
   static unsigned long next_bme280_update = 1000*10;
   if(millis() > next_bme280_update) {
@@ -255,7 +290,11 @@ void loop() {
       redraw = true;
     }
     
+#ifdef CHECK_AMBIENT_LIGHT
+    if(redraw && ambient_light > 0)
+#else
     if(redraw)
+#endif
       update_indoor_conditions();
 
     Serial.print("BME280 Temperature = ");
@@ -274,6 +313,25 @@ void loop() {
     Serial.print(last_indoor_humidity);
     Serial.println(" %");
 
+    Serial.printf("Ambient light %u\n", ambient_light);
+
     Serial.println();
+
+#ifdef MQTT_HOST
+    static unsigned long last_mqtt_update = 0;
+    if(millis() - last_mqtt_update > (60 * 1000))  {
+      last_mqtt_update = millis();
+      char buffer[500];
+
+      snprintf(buffer, 500, "{ \"id\": \"%s\", \"system\": { \"name\": \"%s\", \"freeheap\": %d, \"uptime\": %lu }, \"environment\": { \"temperature\": %0.1f, \"humidity\": %0.1f, \"pressure\": %0.1f },  \"light\": %u }",
+	       MQTT_UUID,
+	       hostname, ESP.getFreeHeap(), uptime.uptime()/1000,
+	       last_indoor_temperature, bme280.readHumidity(), bme280.readPressure(),
+	       ambient_light);
+
+      Serial.println(buffer);
+      mqtt_client.publish("/eink-clock", buffer, true);
+    }
+#endif
   }
 }

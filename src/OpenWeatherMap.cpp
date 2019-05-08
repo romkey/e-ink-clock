@@ -1,352 +1,134 @@
-// #include <WiFi.h>
-#include <WiFiClient.h>
-#include <HTTPClient.h>
-#include "OpenWeatherMap.h"
-
-//------------------------------------------ Universal weather request parcer for opewWeatherMap site ---------
-void OWMrequest::doUpdate(String url, byte maxForecasts) {
-  JsonStreamingParser parser;
-  parser.setListener(this);
-
-  HTTPClient http;
-
-  Serial.print("OWMrequest ");
-  Serial.println(url);
-
-  http.begin(url);
-  bool isBody = false;
-  char c;
-  int size;
-  int httpCode = http.GET();
-
-  if(httpCode > 0) {
-    Serial.printf("GOT MILK %d\n");
-
-    String result = http.getString();
-    Serial.println(result);
-
-    for(int i = 0; i < result.length(); i++) {
-      parser.parse(result.charAt(i));
-    }
-
-#if 0
-    WiFiClient * client = http.getStreamPtr();
-    while(client->connected()) {
-      while((size = client->available()) > 0) {
-        c = client->read();
-        if (c == '{' || c == '[') {
-          isBody = true;
-        }
-        if (isBody) {
-          parser.parse(c);
-        }
-
-	Serial.print(c);
-      }
-    }
+#ifndef ESP32
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #endif
 
+#ifdef ESP32
+#include <WiFi.h>
+#include <HTTPClient.h>
+#endif
+
+#include <JsonStreamingParser.h>
+
+#include "OpenWeatherMap.h"
+#include "OpenWeatherMapCurrentListener.h"
+
+#ifdef OPENWEATHERMAP_HTTPS
+#define OPENWEATHERMAP_PROTOCOL "https"
+#else
+#define OPENWEATHERMAP_PROTOCOL "http"
+#endif
+
+#define WEATHER_URL        OPENWEATHERMAP_PROTOCOL "://api.openweathermap.org/data/2.5/weather"
+#define FORECAST_5DAY_URL  OPENWEATHERMAP_PROTOCOL "://api.openweathermap.org/data/2.5/forecast"
+
+#define PORTLAND_CITY_ID    5746545
+
+#ifdef ESP32
+const char* _openweathermap_root_certificate = \
+"-----BEGIN CERTIFICATE-----\n" \
+"MIIE0DCCA7igAwIBAgIBBzANBgkqhkiG9w0BAQsFADCBgzELMAkGA1UEBhMCVVMx" \
+"EDAOBgNVBAgTB0FyaXpvbmExEzARBgNVBAcTClNjb3R0c2RhbGUxGjAYBgNVBAoT" \
+"EUdvRGFkZHkuY29tLCBJbmMuMTEwLwYDVQQDEyhHbyBEYWRkeSBSb290IENlcnRp" \
+"ZmljYXRlIEF1dGhvcml0eSAtIEcyMB4XDTExMDUwMzA3MDAwMFoXDTMxMDUwMzA3" \
+"MDAwMFowgbQxCzAJBgNVBAYTAlVTMRAwDgYDVQQIEwdBcml6b25hMRMwEQYDVQQH" \
+"EwpTY290dHNkYWxlMRowGAYDVQQKExFHb0RhZGR5LmNvbSwgSW5jLjEtMCsGA1UE" \
+"CxMkaHR0cDovL2NlcnRzLmdvZGFkZHkuY29tL3JlcG9zaXRvcnkvMTMwMQYDVQQD" \
+"EypHbyBEYWRkeSBTZWN1cmUgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IC0gRzIwggEi" \
+"MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC54MsQ1K92vdSTYuswZLiBCGzD" \
+"BNliF44v/z5lz4/OYuY8UhzaFkVLVat4a2ODYpDOD2lsmcgaFItMzEUz6ojcnqOv" \
+"K/6AYZ15V8TPLvQ/MDxdR/yaFrzDN5ZBUY4RS1T4KL7QjL7wMDge87Am+GZHY23e" \
+"cSZHjzhHU9FGHbTj3ADqRay9vHHZqm8A29vNMDp5T19MR/gd71vCxJ1gO7GyQ5HY" \
+"pDNO6rPWJ0+tJYqlxvTV0KaudAVkV4i1RFXULSo6Pvi4vekyCgKUZMQWOlDxSq7n" \
+"eTOvDCAHf+jfBDnCaQJsY1L6d8EbyHSHyLmTGFBUNUtpTrw700kuH9zB0lL7AgMB" \
+"AAGjggEaMIIBFjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNV" \
+"HQ4EFgQUQMK9J47MNIMwojPX+2yz8LQsgM4wHwYDVR0jBBgwFoAUOpqFBxBnKLbv" \
+"9r0FQW4gwZTaD94wNAYIKwYBBQUHAQEEKDAmMCQGCCsGAQUFBzABhhhodHRwOi8v" \
+"b2NzcC5nb2RhZGR5LmNvbS8wNQYDVR0fBC4wLDAqoCigJoYkaHR0cDovL2NybC5n" \
+"b2RhZGR5LmNvbS9nZHJvb3QtZzIuY3JsMEYGA1UdIAQ/MD0wOwYEVR0gADAzMDEG" \
+"CCsGAQUFBwIBFiVodHRwczovL2NlcnRzLmdvZGFkZHkuY29tL3JlcG9zaXRvcnkv" \
+"MA0GCSqGSIb3DQEBCwUAA4IBAQAIfmyTEMg4uJapkEv/oV9PBO9sPpyIBslQj6Zz" \
+"91cxG7685C/b+LrTW+C05+Z5Yg4MotdqY3MxtfWoSKQ7CC2iXZDXtHwlTxFWMMS2" \
+"RJ17LJ3lXubvDGGqv+QqG+6EnriDfcFDzkSnE3ANkR/0yBOtg2DZ2HKocyQetawi" \
+"DsoXiWJYRBuriSUBAA/NxBti21G00w9RKpv0vHP8ds42pM3Z2Czqrpv1KrKQ0U11" \
+"GIo/ikGQI31bS/6kA1ibRrLDYGCD+H1QQc7CoZDDu+8CL9IVVO5EFdkKrqeKM+2x" \
+"LXY2JtwE65/3YR8V3Idv7kaWKK2hJn0KCacuBKONvPi8BDAB" \
+"-----END CERTIFICATE-----\n";
+#endif
+
+OpenWeatherMap::OpenWeatherMap(const char* api_key, const char* zip) : OpenWeatherMap::OpenWeatherMap(api_key) {
+  _zip_code = zip;
+}
+
+OpenWeatherMap::OpenWeatherMap(const char* api_key, int id) : OpenWeatherMap::OpenWeatherMap(api_key) {
+  _city_id = id;
+}
+
+OpenWeatherMap::OpenWeatherMap(const char* api_key) {
+  strncpy(_api_key, api_key, OPENWEATHERMAP_API_KEY_LENGTH);
+  _openweathermap_fingerprint = _OPENWEATHERMAP_FINGERPRINT;
+}
+
+int OpenWeatherMap::update_current() {
+  HTTPClient http;
+  char url[250];
+
+  snprintf(url, 250, "%s?id=%d&APPID=%s", WEATHER_URL, _city_id, _api_key);
+  //  snprintf(url, 250, "%s?id=%d&APPID=%s", FORECAST_5DAY_URL, _city_id, _api_key);
+  Serial.println(url);
+
+#ifdef ESP32
+  // certificate: openssl s_client -showcerts -connect maker.ifttt.com:443 < /dev/null
+  //  http.begin(url, _openweathermap_root_certificate);
+  http.begin(url);
+#else
+  // fingerprint: openssl s_client -connect maker.ifttt.com:443  < /dev/null 2>/dev/null | openssl x509 -fingerprint -noout | cut -d'=' -f2
+  //  http.begin(url, _openweathermap_fingerprint);
+  http.begin(url);
+#endif
+
+  Serial.println("1");
+
+  int httpCode = http.GET();
+  Serial.println("1.0");
+
+  if(httpCode > 0) {
+    Serial.println("1.1");
+
+    Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+    if(httpCode != HTTP_CODE_OK) {
+      Serial.println("1.2");
+      http.end();
+      Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+      return -1;
+    }
   } else {
-    Serial.printf("HTTP fail %d\n", httpCode);
-  }
-}
-
-void OWMrequest::init(void) {
-  for (byte i = 0; i < OWM_max_layers; ++i)
-    p_key[i] = "";
-  currentParent = currentKey = "";
-}
-
-void OWMrequest::startObject() {
-  for (byte i = OWM_max_layers-1; i > 0; --i) {
-    p_key[i] = p_key[i-1];
-  }
-  p_key[0] = currentParent;
-  currentParent = currentKey;
-}
-
-void OWMrequest::endObject() {
-  currentParent = p_key[0];
-  for (byte i = 0; i < OWM_max_layers-1; ++i) {
-    p_key[i] = p_key[i+1];
-  }
-  currentKey = "";
-}
-
-//------------------------------------------ Current weather conditions from openweatrhermap.org --------------
-void OWMconditions::updateConditions(OWM_conditions *conditions, String apiKey, String country, String city, String units, String language) {
-  this->conditions = conditions;
-  OWMrequest::init();
-
-  units = "Imperial";
-
-  String url = "http://api.openweathermap.org/data/2.5/weather?zip=97217";
-  if (language != "") url += "&lang="  + language;
-  if (units != "")    url += "&units=" + units;
-  url +=  + "&appid=" + apiKey;
-  doUpdate(url);
-  this->conditions = nullptr;
-}
-
-void OWMconditions::value(String value) {
-  if (currentKey == "lon") {
-    conditions->longtitude = value;
-  } else
-  if (currentKey == "lat") {
-    conditions->latitude = value;
-  } else
-  if (currentKey == "id") {
-    conditions->id = value;
-  } else
-  if (currentKey == "main") {
-    conditions->main = value;
-  } else
-  if (currentKey == "description") {
-    conditions->description = value;
-  } else
-  if (currentKey == "icon") {
-    conditions->icon = value;
-  } else
-  if (currentKey == "temp") {
-    conditions->temp = value;
-  } else
-  if (currentKey == "pressure") {
-    conditions->pressure = value;
-  } else
-  if (currentKey == "humidity") {
-    conditions->humidity = value;
-  } else
-  if (currentKey == "temp_min") {
-    conditions->t_min = value;
-  } else
-  if (currentKey == "temp_max") {
-    conditions->t_max = value;
-  } else
-  if (currentKey == "visibility") {
-    conditions->visibility = value;
-  } else
-  if (currentParent == "wind" && currentKey == "speed") {
-    conditions->w_speed = value;
-  } else
-  if (currentParent == "wind" && currentKey == "deg") {
-    conditions->w_deg = value;
-  } else
-  if (currentParent == "clouds" && currentKey == "all") {
-    conditions->cond = currentParent;
-    conditions->cond_value = value;
-  } else
-  if (currentParent == "rain" && currentKey == "3h") {
-    conditions->cond = currentParent;
-    conditions->cond_value = value;
-  }  else
-  if (currentParent == "snow" && currentKey == "3h") {
-    conditions->cond = currentParent;
-    conditions->cond_value = value;
-  } else
-  if (currentKey == "dt") {
-    conditions->dt = value;
-  } else
-  if (currentKey == "sunrise") {
-    conditions->sunrise = value;
-  } else
-  if (currentKey == "sunset") {
-    conditions->sunset = value;
-  }
-}
-
-//------------------------------------------ Five day forecast from openweatrhermap.org -----------------------
-byte OWMfiveForecast::updateForecast(OWM_fiveForecast *forecasts, byte maxForecasts, String apiKey, String country, String city, String units, String language) {
-  this->forecasts = forecasts;
-  this->max_forecasts = maxForecasts;
-  OWMrequest::init();
-  index = 0;
-  timestamp = 0;
-
-  String url = "http://api.openweathermap.org/data/2.5/forecast?q=" + city + "," + country;
-  if (language != "") url += "&lang="  + language;
-  if (units != "")    url += "&units=" + units;
-  url +=  + "&appid=" + apiKey;
-  doUpdate(url, maxForecasts);
-
-  this->forecasts = nullptr;
-  return index;
-}
-
-void OWMfiveForecast::value(String value) {
-  if (currentKey == "dt") {
-    if (timestamp == 0) {
-      index = 0;
-      forecasts[index].dt = value;
-      timestamp = value.toInt();
-    } else {
-      uint32_t t = value.toInt();
-      if (t > timestamp) {                          // new forecast time
-	      if (index < max_forecasts - 1) {
-    	    ++index;
-          timestamp = t;
-    	    forecasts[index].dt = value;
-    	  }
-      }
-    }
-  } else
-  if (currentKey == "temp") {
-    forecasts[index].temp = value;
-  } else
-  if (currentKey == "temp_min") {
-    forecasts[index].t_min = value;
-  } else
-  if (currentKey == "temp_max") {
-    forecasts[index].t_max = value;
-  } else
-  if (currentKey == "pressure") {
-    forecasts[index].pressure = value;
-  } else
-  if (currentKey == "sea_level") {
-    forecasts[index].sea_pressure = value;
-  } else
-  if (currentKey == "humidity") {
-    forecasts[index].humidity = value;
-  } else
-  if (currentParent == "weather" && currentKey == "description") {
-    forecasts[index].description = value;
-  } else
-  if (currentParent == "weather" && currentKey == "icon") {
-    forecasts[index].icon = value;
-  } else
-  if (currentParent == "weather" && currentKey == "id") {
-    forecasts[index].id = value;
-  } else
-  if (currentParent == "wind" && currentKey == "speed") {
-    forecasts[index].w_speed = value;
-  } else
-  if (currentParent == "wind" && currentKey == "deg") {
-    forecasts[index].w_deg = value;
-  } else
-  if (currentParent == "clouds" && currentKey == "all") {
-    forecasts[index].cond = currentParent;
-    forecasts[index].cond_value = value;
-  } else
-  if (currentParent == "rain" && currentKey == "3h") {
-    forecasts[index].cond = currentParent;
-    forecasts[index].cond_value = value;
-  }  else
-  if (currentParent == "snow" && currentKey == "3h") {
-    forecasts[index].cond = currentParent;
-    forecasts[index].cond_value = value;
-  }
-}
-
-//------------------------------------------ Sexteen days weather forecast from openweathermap.org -----------
-byte OWMsixteenForecast::updateForecast(OWM_sixteenLocation *location, OWM_sixteenForecast *forecasts,
-                                        byte maxForecasts, String apiKey, String country, String city, String units, String language) {
-  this->location  = location;
-  this->forecasts = forecasts;
-  this->max_forecasts = maxForecasts;
-  OWMrequest::init();
-  index = 0;
-  timestamp = 0;
-
-  String url = "http://api.openweathermap.org/data/2.5/forecast/daily?q=" + city + "," + country;
-  if (language != "") url += "&lang="  + language;
-  if (units != "")    url += "&units=" + units;
-  url +=  + "&appid=" + apiKey;    
-  doUpdate(url, maxForecasts);
-  this->forecasts = nullptr;
-  this->location  = nullptr;
-  return index;
-}
-
-void OWMsixteenForecast::value(String value) {
-  // First fill up the location info
-  if (location) {
-    if (currentParent == "city" && currentKey == "id") {
-      location->city_id = value;
-    } else
-    if (currentParent == "city" && currentKey == "name") {
-      location->city_name = value;
-    } else
-    if (currentParent == "coord" && currentKey == "lon") {
-      location->longtitude = value;
-    } else
-    if (currentParent == "coord" && currentKey == "lat") {
-      location->latitude = value;
-    } else
-    if (currentParent == "city" && currentKey == "country") {
-      location->country = value;
-    } else
-    if (currentParent == "city" && currentKey == "population") {
-      location->population = value;
-    } else
-    if (currentKey == "cod") {
-      location->cod = value;
-    } else
-    if (currentKey == "message") {
-      location->message = value;
-    }
+    Serial.println(httpCode);
+    Serial.println("1.3");
+    http.end();
+    Serial.println("1.4");
+    return -1;
   }
 
-  // Second, fill up the dayly forecast
-  if (currentKey == "dt") {
-    if (timestamp == 0) {
-      index = 0;
-      forecasts[index].dt = value;
-      timestamp = value.toInt();
-    } else {
-      uint32_t t = value.toInt();
-      if (t > timestamp) {                          // new forecast time
-        if (index < max_forecasts - 1) {
-          ++index;
-          timestamp = t;
-          forecasts[index].dt = value;
-        }
-      }
-    }
-  } else
-  if (currentParent == "temp" && currentKey == "min") {
-    forecasts[index].t_min = value;
-  } else
-  if (currentParent == "temp" && currentKey == "max") {
-    forecasts[index].t_max = value;
-  } else
-  if (currentParent == "temp" && currentKey == "night") {
-    forecasts[index].t_night = value;
-  } else
-  if (currentParent == "temp" && currentKey == "morn") {
-    forecasts[index].t_morning = value;
-  } else
-  if (currentParent == "temp" && currentKey == "day") {
-    forecasts[index].t_day = value;
-  } else
-  if (currentParent == "temp" && currentKey == "eve") {
-    forecasts[index].t_evening = value;
-  } else
+  Serial.println("2");
 
-  if (currentKey == "pressure") {
-    forecasts[index].pressure = value;
-  } else
-  if (currentKey == "humidity") {
-    forecasts[index].humidity = value;
-  } else
-  if (currentParent == "weather" && currentKey == "description") {
-    forecasts[index].description = value;
-  } else
-  if (currentParent == "weather" && currentKey == "icon") {
-    forecasts[index].icon = value;
-  } else
-  if (currentParent == "weather" && currentKey == "id") {
-    forecasts[index].id = value;
-  } else
-  if (currentParent == "weather" && currentKey == "description") {
-    forecasts[index].description = value;
-  } else
-  
-  if (currentKey == "speed") {
-    forecasts[index].w_speed = value;
-  } else
-  if (currentKey == "deg") {
-    forecasts[index].w_deg = value;
-  } else
-  if (currentKey == "clouds") {
-    forecasts[index].clouds = value;
+  Serial.println("JSON!");
+  String json_str = http.getString();
+  Serial.println(json_str);
+ 
+  JsonStreamingParser parser;
+  OpenWeatherMapCurrentListener listener;
+
+  parser.setListener(&listener);
+
+  for (int i = 0; i < json_str.length(); i++) {
+    parser.parse(json_str[i]);
   }
+
+  Serial.println(C_TO_F(listener._conditions.temp));
+
+  _current_conditions = listener._conditions;
+
+  return 0;
 }

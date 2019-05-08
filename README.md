@@ -43,4 +43,6 @@ The application uses the [GxEPD](https://github.com/ZinggJM/GxEPD) library to dr
 ## Resources:
 
 - turn an image file into a C language bitmap - [image2cpp](https://javl.github.io/image2cpp/)
+- use `fontconvert` from Adafruit GFX Library to convert fonts to Adafruit GFX format
+
 
