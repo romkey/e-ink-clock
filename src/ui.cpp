@@ -24,17 +24,22 @@ void ClockUI::begin() {
   _display->setTextColor(GxEPD_BLACK);
 
   show_wifi_symbol();
+  
   _display->update();
 }
 
 
 void ClockUI::show_wifi_symbol() {
+  _display->fillScreen(GxEPD_WHITE);
   _display->drawBitmap(wifi_symbol, 69, 19, 262, 193, GxEPD_BLACK);
+  _display->update();
 }
 
 void ClockUI::clear_wifi_symbol() {
   _display->fillRect(69, 19, 262, 193, GxEPD_WHITE);
+  // _display->fillScreen(GxEPD_WHITE);
   _display->updateWindow(69, 19, 262, 193);
+  _display->update();
 }
 
 void ClockUI::show_network_info(IPAddress local_ip, const char* name, const char* ssid) {

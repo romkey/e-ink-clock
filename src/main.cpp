@@ -68,10 +68,27 @@ WiFiMulti wifiMulti;
 
 unsigned long start_showing_clock = 0;
 
+#ifdef BUILD_INFO
+
+#define STRINGIZE_NX(A) #A
+#define STRINGIZE(A) STRINGIZE_NX(A)
+
+static char build_info[] = STRINGIZE(BUILD_INFO);
+#else
+static char build_info[] = "not set";
+#endif
+
 static char hostname[sizeof("eink-clock-%02x%02x%02x") + 1];
+
+static RTC_DATA_ATTR int bootCount = 0;
+static RTC_DATA_ATTR int wifi_failures = 0;
+
+void command_callback(const char* topic, byte* payload, unsigned int length);
 
 void setup() {
   byte mac_address[6];
+
+  bootCount++;
   
   delay(500);
 
@@ -101,7 +118,10 @@ void setup() {
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASSWORD1);
   wifiMulti.addAP(WIFI_SSID2, WIFI_PASSWORD2);
   wifiMulti.addAP(WIFI_SSID3, WIFI_PASSWORD3);
+  wifiMulti.run();
 
+  //  clock_ui.show_wifi_symbol();
+  
   while(wifiMulti.run() != WL_CONNECTED) {
     Serial.print(".");
     delay(200);
@@ -123,7 +143,7 @@ void setup() {
   configTime(TZ_OFFSET, DST_OFFSET, "pool.ntp.org", "time.nist.gov");
 
   Serial.println("[OTA]");
-  ArduinoOTA.setHostname(HOSTNAME);
+  ArduinoOTA.setHostname(hostname);
   ArduinoOTA
     .onStart([]() {
       String type;
@@ -173,6 +193,8 @@ void setup() {
 
   mqtt_client.setServer(MQTT_HOST, MQTT_PORT);
   mqtt_client.connect(MQTT_UUID, MQTT_USER, MQTT_PASS);
+  mqtt_client.setCallback(command_callback);
+  mqtt_client.subscribe("/eink-clock/cmd");
 
   Serial.println("[homebus]");
   Serial.println("[mqtt]");
@@ -215,28 +237,93 @@ void update_indoor_conditions() {
     clock_ui.show_indoor(last_indoor_temperature, last_indoor_humidity);
 }
 
-void loop() {
-  static unsigned long next_weather_update = 0;
-  static uint8_t draw_clock_ui = 1;
-  static unsigned long last_mqtt_check = 0;
+#define CLOCK 0
+#define REHAB 1
+static int mode = CLOCK;
 
-  unsigned ambient_light = analogRead(AMBIENT_LIGHT_PIN);
+void command_callback(const char* topic, byte* payload, unsigned int length) {
+  char payload_str[length+1];
+  memcpy(payload_str, payload, length);
+  payload_str[length] = '\0';
 
-  mqtt_client.loop();
+  Serial.printf("command: topic %s, payload %s\n", topic, payload_str);
 
-  if(millis() > last_mqtt_check + 5000) {
-    if(!mqtt_client.connected()) {
-      mqtt_client.connect(MQTT_UUID, MQTT_USER, MQTT_PASS);
-      Serial.println("mqtt reconnect");
-    }
+  if(strcmp(payload_str, "restart") == 0)
+    ESP.restart();
 
-    last_mqtt_check = millis();
+  if(strcmp(payload_str, "clock") == 0) {
+    Serial.println("clock mode");
+    mode = CLOCK;
   }
 
-  ArduinoOTA.handle();
+  if(strcmp(payload_str, "rehab") == 0) {
+    Serial.println("rehab mode");
+    mode = REHAB;
+  }
+}
 
-  if(millis() < start_showing_clock)
+void loop_rehab() {
+  static int submode = 0;
+  static unsigned long next_rehab_update = 0;
+
+  if(next_rehab_update > millis())
     return;
+
+  switch(submode) {
+  case 0:
+    display.fillScreen(GxEPD_WHITE);
+    display.update();
+    submode++;
+    break;
+  case 1:
+    display.fillScreen(GxEPD_BLACK);
+    display.update();
+    submode++;
+    break;
+  case 2:
+    display.fillScreen(GxEPD_WHITE);
+    display.update();
+    submode++;
+    break;
+  case 3:
+    for(int x = 0; x < 400;  x += 10)
+      for(int y = 0; y < 300; y += 10) {
+	for(int i = 0; i < 5; i++)
+	  for(int j = 0; j < 5 ; j++)
+	    display.drawPixel(x+i, y+j, GxEPD_WHITE);
+
+	for(int i = 0; i < 5; i++)
+	  for(int j = 0; j < 5 ; j++)
+	    display.drawPixel(x+i+5, y+j+5, GxEPD_BLACK);
+      }
+    display.update();
+    submode++;
+    break;
+  case 4:
+    for(int x = 0; x < 400;  x += 10)
+      for(int y = 0; y < 300; y += 10) {
+	for(int i = 0; i < 5; i++)
+	  for(int j = 0; j < 5 ; j++)
+	    display.drawPixel(x+i, y+j, GxEPD_BLACK);
+
+	for(int i = 0; i < 5; i++)
+	  for(int j = 0; j < 5 ; j++)
+	    display.drawPixel(x+i+5, y+j+5, GxEPD_WHITE);
+      }
+    display.update();
+    submode++;
+    break;
+  case 5:
+    submode = 0;
+    return;
+  };
+
+  next_rehab_update += 3*60*1000;
+}
+
+void loop_clock() {
+  static unsigned long next_weather_update = 0;
+  static uint8_t draw_clock_ui = 1;
 
   if(draw_clock_ui) {
     draw_clock_ui = 0;
@@ -255,9 +342,9 @@ void loop() {
   localtime_r(&now, &timeinfo);
 
 #ifdef CHECK_AMBIENT_LIGHT
-  if(last_timeinfo.tm_sec != timeinfo.tm_sec) {
-#else
   if(last_timeinfo.tm_sec != timeinfo.tm_sec && ambient_light > 0) {
+#else
+  if(last_timeinfo.tm_sec != timeinfo.tm_sec) {
 #endif
     update_time();
     last_timeinfo = timeinfo;
@@ -273,6 +360,35 @@ void loop() {
     owm.update_current();
     owm_conditions();
   }
+}
+
+void loop() {
+  static unsigned long last_mqtt_check = 0;
+
+  unsigned ambient_light = analogRead(AMBIENT_LIGHT_PIN);
+
+  mqtt_client.loop();
+
+  if(millis() > last_mqtt_check + 5000) {
+    if(!mqtt_client.connected()) {
+      mqtt_client.connect(MQTT_UUID, MQTT_USER, MQTT_PASS);
+      mqtt_client.subscribe("/eink-clock/cmd");
+      Serial.println("mqtt reconnect");
+    }
+
+    last_mqtt_check = millis();
+  }
+
+  ArduinoOTA.handle();
+
+  if(mode == REHAB)
+    loop_rehab();
+
+  if(millis() < start_showing_clock)
+    return;
+
+  if(mode ==  CLOCK)
+    loop_clock();
 
   static unsigned long next_bme280_update = 1000*10;
   if(millis() > next_bme280_update) {
@@ -291,9 +407,9 @@ void loop() {
     }
     
 #ifdef CHECK_AMBIENT_LIGHT
-    if(redraw && ambient_light > 0)
+    if(mode == CLOCK && redraw && ambient_light > 0)
 #else
-    if(redraw)
+    if(mode == CLOCK && redraw)
 #endif
       update_indoor_conditions();
 
@@ -317,21 +433,29 @@ void loop() {
 
     Serial.println();
 
-#ifdef MQTT_HOST
     static unsigned long last_mqtt_update = 0;
     if(millis() - last_mqtt_update > (60 * 1000))  {
       last_mqtt_update = millis();
       char buffer[500];
+      IPAddress local = WiFi.localIP();
 
-      snprintf(buffer, 500, "{ \"id\": \"%s\", \"system\": { \"name\": \"%s\", \"freeheap\": %d, \"uptime\": %lu }, \"environment\": { \"temperature\": %0.1f, \"humidity\": %0.1f, \"pressure\": %0.1f },  \"light\": %u }",
+      static bool first = true;
+      if(first) {
+	first = false;
+	snprintf(buffer, 500, "{ \"id\": \"%s\", \"message\": \"booted\", \"system\": { \"name\": \"%s\", \"build\": \"%s\", \"ip\": \"%d.%d.%d.%d\", \"rssi\": %d } }",
+		 MQTT_UUID,
+		 hostname, build_info, local[0], local[1], local[2], local[3], WiFi.RSSI());
+	mqtt_client.publish("/eink-clock/log", buffer, true);
+      }
+
+      snprintf(buffer, 500, "{ \"id\": \"%s\", \"system\": { \"name\": \"%s\", \"build\": \"%s\", \"freeheap\": %d, \"uptime\": %lu, \"ip\": \"%d.%d.%d.%d\", \"rssi\": %d, \"reboots\": %d, \"wifi_failures\": %d  }, \"environment\": { \"temperature\": %0.1f, \"humidity\": %0.1f, \"pressure\": %0.1f },  \"light\": %u }",
 	       MQTT_UUID,
-	       hostname, ESP.getFreeHeap(), uptime.uptime()/1000,
-	       last_indoor_temperature, bme280.readHumidity(), bme280.readPressure(),
+	       hostname, build_info, ESP.getFreeHeap(), uptime.uptime()/1000,  local[0], local[1], local[2], local[3], WiFi.RSSI(), bootCount, wifi_failures,
+	       last_indoor_temperature, bme280.readHumidity(), bme280.readPressure()/100.0,
 	       ambient_light);
 
       Serial.println(buffer);
       mqtt_client.publish("/eink-clock", buffer, true);
     }
-#endif
   }
 }

@@ -8,7 +8,6 @@ U8G2_FOR_ADAFRUIT_GFX u8g2;
 #endif
 
 #include <GxEPD.h>
-#include <GxEPD.h>
 #include <GxGDEW042T2/GxGDEW042T2.h>
 #include <GxIO/GxIO_SPI/GxIO_SPI.h>
 #include <GxIO/GxIO.h>
