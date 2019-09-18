@@ -260,6 +260,9 @@ void command_callback(const char* topic, byte* payload, unsigned int length) {
     Serial.println("rehab mode");
     mode = REHAB;
   }
+
+  if(strcmp(payload_str, "ping") == 0)
+    mqtt_client.publish("/eink-clock/cmd", "\"pong\"");
 }
 
 void loop_rehab() {

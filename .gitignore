@@ -3,6 +3,7 @@ config.h
 # PlatformIO
 /.piolibdeps/*
 /.pioenvs
+/.pio
 
 # Prerequisites
 *.d
