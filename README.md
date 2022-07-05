@@ -1,5 +1,7 @@
 # e-ink wifi clock
 
+![Test build](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
+
 _This is a work in progress. I'm still testing and updating the hardware, and the software is incomplete. Build at your own risk._
 
 Use a Waveshare epaper (e-ink) display as a digital wifi clock. The clock synchronizes its time with NTP and can show local weather using OpenWeatherMap.
