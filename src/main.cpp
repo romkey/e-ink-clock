@@ -7,9 +7,6 @@
 
 #include "config.h"
 
-#include <IFTTTWebhook.h>
-IFTTTWebhook ifttt(IFTTT_API_KEY, IFTTT_TRIGGER_NAME);
-
 #include "OpenWeatherMap.h"
 
 OpenWeatherMap owm(OPEN_WEATHERMAP_API_KEY, OPEN_WEATHERMAP_CITY_CODE);
@@ -135,10 +132,6 @@ void setup() {
   else
     Serial.println("[mDNS]");
 
-  Serial.println("[IFTTT]");
-  ifttt.trigger("reboot", reboot_reason(rtc_get_reset_reason(0)),  reboot_reason(rtc_get_reset_reason(1)));
-
-
   Serial.println("[NTP]");
   configTime(TZ_OFFSET, DST_OFFSET, "pool.ntp.org", "time.nist.gov");
 
@@ -152,13 +145,10 @@ void setup() {
       else // U_SPIFFS
         type = "filesystem";
 
-      ifttt.trigger("update", "start", type.c_str());
-
       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
       Serial.println("Start updating " + type);
     })
     .onEnd([]() {
-      ifttt.trigger("update", "end");
       Serial.println("\nEnd");
     })
     .onProgress([](unsigned int progress, unsigned int total) {
@@ -167,7 +157,6 @@ void setup() {
     .onError([](ota_error_t error) {
 	char buffer[10];
 	snprintf(buffer, 10, "%u", error);
-	ifttt.trigger("update", "error", buffer);
 
       Serial.printf("Error[%u]: ", error);
       if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");

@@ -9,12 +9,17 @@
 
 #define HOSTNAME "eink-clock"
 
-// currently pacific time
+// currently pacific time - set these to your timezone offset and savings time offset in seconds
 #define TZ_OFFSET -8*60*60 
 #define DST_OFFSET 0
 
+// OpenWeatherMap - you'll need your own API key and your city code
 #define OPEN_WEATHERMAP_API_KEY "YOUR OPENWEATHERMAP KEY"
+#define OPEN_WEATHERMAP_CITY_CODE "YOUR OPENWEATHERMAP CITY"
 
-#define IFTTT_API_KEY        "YOUR IFFT API KEY"
-#define IFTTT_TRIGGER_NAME   "eink-clock"
-
+// receive commands over MQTT
+#define MQTT_HOST ""
+#define MQTT_PORT 1883
+#define MQTT_USER ""
+#define MQTT_PASS ""
+#define MQTT_UUID ""
