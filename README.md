@@ -46,3 +46,13 @@ The application uses the [GxEPD](https://github.com/ZinggJM/GxEPD) library to dr
 - use `fontconvert` from Adafruit GFX Library to convert fonts to Adafruit GFX format
 
 
+## Configuration
+
+Copy `src/config.h-example` to `src/config.h` and set the constants in the file as you need them:
+- `WIFI_SSID1`, `WIFI_PASSWORD1` - your primary WiFi SSID and password 
+- `WIFI_SSID2`, `WIFI_PASSWORD2` - your backup WiFi SSID and password  - set to the same as primary if you don't have a backup
+- `WIFI_SSID3`, `WIFI_PASSWORD3` - your bakup backup WiFi SSID and password  - set to the same as backup if you don't have a backup backup
+
+## License
+
+Permission to use this software is granted under the [MIT License](https://romkey.mit-license.org).
