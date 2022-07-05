@@ -1,6 +1,6 @@
 # e-ink wifi clock
 
-![Test build](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
+![Test build]((https://github.com/romkey/e-ink-clock/actions/workflows/main.yml/badge.svg)
 
 _This is a work in progress. I'm still testing and updating the hardware, and the software is incomplete. Build at your own risk._
 
